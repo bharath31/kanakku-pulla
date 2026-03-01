@@ -1,0 +1,30 @@
+app = 'kanakku-pulla'
+primary_region = 'sin'
+
+[build]
+
+[env]
+  DATABASE_URL = 'sqlite:////data/kanakku.db'
+  CORS_ORIGINS = 'https://kanakku-pulla.fly.dev,https://kanakku-pulla.bharath.sh'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[http_service.checks]]
+  grace_period = "30s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "5s"
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'
+
+[mounts]
+  source = 'kanakku_data'
+  destination = '/data'

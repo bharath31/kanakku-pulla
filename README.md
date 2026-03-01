@@ -17,6 +17,11 @@ Your data **never leaves your machine**. Everything runs locally:
 - AI categorization sends only merchant names (no personal data)
 - No email passwords stored — uses email forwarding via AgentMail
 
+## One-Click Deploy
+
+[![Deploy on Fly.io](https://fly.io/button/button.svg)](https://fly.io/launch?repo=https://github.com/bharath31/kanakku-pulla)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template?repo=https://github.com/bharath31/kanakku-pulla)
+
 ## Quick Start
 
 ### Docker (Recommended)
