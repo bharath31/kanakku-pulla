@@ -11,9 +11,10 @@ RUN npm run build
 FROM python:3.11-slim
 WORKDIR /app
 
-# Install Node.js, supervisord, and Caddy
+# Install Node.js, supervisord, Caddy, and build deps for cffi
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl supervisor debian-keyring debian-archive-keyring apt-transport-https gpg \
+    libffi-dev gcc \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg \
