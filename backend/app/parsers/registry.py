@@ -29,7 +29,7 @@ def auto_detect_and_parse(pdf_bytes: bytes, password: str | None = None) -> tupl
 
 def _auto_register():
     """Import all parser modules to trigger registration."""
-    from app.parsers import hdfc, icici, sbi, axis  # noqa: F401
+    from app.parsers import hdfc, icici, sbi, axis, amex  # noqa: F401
 
 
 _auto_register()
