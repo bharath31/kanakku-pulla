@@ -18,6 +18,8 @@ export const createCard = (data: CardCreate) =>
   request<Card>("/cards", { method: "POST", body: JSON.stringify(data) });
 export const deleteCard = (id: number) =>
   request("/cards/" + id, { method: "DELETE" });
+export const createCardInbox = (cardId: number) =>
+  request<Card>(`/cards/${cardId}/inbox`, { method: "POST" });
 
 // Statements
 export const getStatements = (cardId?: number) =>
@@ -85,6 +87,8 @@ export interface Card {
   holder_name: string;
   dob: string | null;
   credit_limit: number | null;
+  inbox_id: number | null;
+  inbox_email: string | null;
 }
 
 export interface CardCreate {
