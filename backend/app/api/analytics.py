@@ -23,11 +23,31 @@ def monthly_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    today = date.today()
-    m = month or today.month
-    y = year or today.year
-
     user_card_ids = [c.id for c in db.query(CreditCard).filter(CreditCard.user_id == current_user.id).all()]
+
+    # If no month/year specified, find the most recent month with data
+    if month is None and year is None:
+        latest = (
+            db.query(
+                func.strftime("%Y", Transaction.txn_date).label("y"),
+                func.strftime("%m", Transaction.txn_date).label("m"),
+            )
+            .filter(Transaction.card_id.in_(user_card_ids), Transaction.txn_date.isnot(None))
+            .order_by(func.strftime("%Y-%m", Transaction.txn_date).desc())
+            .first()
+        )
+        if latest and latest.y and latest.m:
+            y = int(latest.y)
+            m = int(latest.m)
+        else:
+            today = date.today()
+            m = today.month
+            y = today.year
+    else:
+        today = date.today()
+        m = month or today.month
+        y = year or today.year
+
     query = db.query(Transaction).filter(
         func.strftime("%m", Transaction.txn_date) == f"{m:02d}",
         func.strftime("%Y", Transaction.txn_date) == str(y),
