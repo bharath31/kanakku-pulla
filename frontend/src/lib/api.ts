@@ -202,7 +202,7 @@ export interface MonthlyAnalytics {
   total_fees: number;
   transaction_count: number;
   category_breakdown: { name: string; amount: number }[];
-  daily_spend: { date: string; amount: number }[];
+  monthly_spend: { month: string; amount: number }[];
   top_merchants: { name: string; amount: number }[];
 }
 

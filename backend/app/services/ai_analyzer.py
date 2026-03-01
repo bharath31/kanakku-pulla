@@ -55,6 +55,18 @@ KNOWN_MERCHANTS = {
     "practo": "Healthcare",
     "pharmeasy": "Healthcare",
     "1mg": "Healthcare",
+    # Payments / credits
+    "bbps": "Transfers",
+    "payment received": "Transfers",
+    "bill payment": "Transfers",
+    "neft": "Transfers",
+    "rtgs": "Transfers",
+    "imps": "Transfers",
+    "upi": "Transfers",
+    "credit received": "Transfers",
+    "cashback": "Transfers",
+    "reversal": "Transfers",
+    "refund": "Transfers",
 }
 
 # Category inference from web search keywords
