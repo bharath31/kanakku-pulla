@@ -36,9 +36,9 @@ export const getMe = () =>
   request<{ id: number; username: string; email: string | null }>("/auth/me");
 
 // Cards
-export const getCards = () => request<Card[]>("/cards");
+export const getCards = () => request<Card[]>("/cards/");
 export const createCard = (data: CardCreate) =>
-  request<Card>("/cards", { method: "POST", body: JSON.stringify(data) });
+  request<Card>("/cards/", { method: "POST", body: JSON.stringify(data) });
 export const deleteCard = (id: number) =>
   request("/cards/" + id, { method: "DELETE" });
 export const createCardInbox = (cardId: number) =>
@@ -46,7 +46,7 @@ export const createCardInbox = (cardId: number) =>
 
 // Statements
 export const getStatements = (cardId?: number) =>
-  request<Statement[]>("/statements" + (cardId ? `?card_id=${cardId}` : ""));
+  request<Statement[]>("/statements/" + (cardId ? `?card_id=${cardId}` : ""));
 
 export const uploadStatement = async (file: File, cardId: number) => {
   const form = new FormData();
@@ -66,7 +66,7 @@ export const uploadStatement = async (file: File, cardId: number) => {
 // Transactions
 export const getTransactions = (params?: Record<string, string>) => {
   const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-  return request<Transaction[]>("/transactions" + qs);
+  return request<Transaction[]>("/transactions/" + qs);
 };
 
 export const updateCategory = (txnId: number, categoryId: number) =>
@@ -91,7 +91,7 @@ export const getFeeBreakdown = () => request<FeeBreakdown>("/analytics/fees");
 // Alerts
 export const getAlerts = (params?: Record<string, string>) => {
   const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-  return request<Alert[]>("/alerts" + qs);
+  return request<Alert[]>("/alerts/" + qs);
 };
 
 export const getAlertSummary = () => request<AlertSummary>("/alerts/summary");

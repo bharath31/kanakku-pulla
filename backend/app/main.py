@@ -1,17 +1,33 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 
 from app.config import settings
 from app.database import Base, engine
 from app.seed import seed_categories
 from app.api import auth, cards, statements, transactions, analytics, alerts, webhooks, inboxes
 
+logger = logging.getLogger(__name__)
+
+
+def _run_migrations():
+    """Add columns that are missing from existing tables."""
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        if "credit_cards" in inspector.get_table_names():
+            existing = {col["name"] for col in inspector.get_columns("credit_cards")}
+            if "user_id" not in existing:
+                logger.info("Adding user_id column to credit_cards")
+                conn.execute(text("ALTER TABLE credit_cards ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _run_migrations()
     seed_categories()
     yield
 
