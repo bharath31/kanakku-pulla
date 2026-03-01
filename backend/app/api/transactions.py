@@ -3,9 +3,12 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models.category import Category
+from app.models.credit_card import CreditCard
 from app.models.transaction import Transaction
+from app.models.user import User
 from app.schemas.transactions import CategoryOverride, TransactionResponse
 
 router = APIRouter()
@@ -25,8 +28,10 @@ def list_transactions(
     limit: int = Query(default=100, le=500),
     offset: int = 0,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    query = db.query(Transaction)
+    user_card_ids = [c.id for c in db.query(CreditCard).filter(CreditCard.user_id == current_user.id).all()]
+    query = db.query(Transaction).filter(Transaction.card_id.in_(user_card_ids))
 
     if card_id:
         query = query.filter(Transaction.card_id == card_id)
@@ -66,8 +71,14 @@ def list_transactions(
 
 
 @router.put("/{txn_id}/category", response_model=TransactionResponse)
-def update_category(txn_id: int, override: CategoryOverride, db: Session = Depends(get_db)):
-    txn = db.query(Transaction).filter(Transaction.id == txn_id).first()
+def update_category(
+    txn_id: int,
+    override: CategoryOverride,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    user_card_ids = [c.id for c in db.query(CreditCard).filter(CreditCard.user_id == current_user.id).all()]
+    txn = db.query(Transaction).filter(Transaction.id == txn_id, Transaction.card_id.in_(user_card_ids)).first()
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
@@ -85,5 +96,5 @@ def update_category(txn_id: int, override: CategoryOverride, db: Session = Depen
 
 
 @router.get("/categories")
-def list_categories(db: Session = Depends(get_db)):
+def list_categories(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return db.query(Category).all()

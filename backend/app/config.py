@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     agentmail_api_key: str = ""
     agentmail_webhook_secret: str = ""
 
+    # Auth
+    jwt_secret_key: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

@@ -7,6 +7,7 @@ class CreditCard(Base):
     __tablename__ = "credit_cards"
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     inbox_id = Column(Integer, ForeignKey("inboxes.id"), nullable=True)
     bank = Column(String, nullable=False)
     card_name = Column(String)

@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models.alert import Alert
+from app.models.user import User
 from app.schemas.alerts import AlertResponse, AlertSummary
 
 router = APIRouter()
@@ -16,6 +18,7 @@ def list_alerts(
     limit: int = Query(default=50, le=200),
     offset: int = 0,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     query = db.query(Alert).filter(Alert.is_dismissed == False)  # noqa: E712
 
@@ -30,7 +33,7 @@ def list_alerts(
 
 
 @router.get("/summary", response_model=AlertSummary)
-def alert_summary(db: Session = Depends(get_db)):
+def alert_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     base = db.query(Alert).filter(Alert.is_dismissed == False)  # noqa: E712
     total = base.count()
     unread = base.filter(Alert.is_read == False).count()  # noqa: E712
@@ -40,7 +43,7 @@ def alert_summary(db: Session = Depends(get_db)):
 
 
 @router.put("/{alert_id}/read")
-def mark_read(alert_id: int, db: Session = Depends(get_db)):
+def mark_read(alert_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -50,7 +53,7 @@ def mark_read(alert_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{alert_id}/dismiss")
-def dismiss_alert(alert_id: int, db: Session = Depends(get_db)):
+def dismiss_alert(alert_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     alert = db.query(Alert).filter(Alert.id == alert_id).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")

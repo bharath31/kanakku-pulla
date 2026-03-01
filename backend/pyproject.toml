@@ -19,6 +19,7 @@ dependencies = [
     "python-multipart>=0.0.12",
     "agentmail>=0.2.0",
     "cffi>=1.17.0",
+    "passlib>=1.7.4",
 ]
 
 [project.optional-dependencies]

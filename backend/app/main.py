@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import Base, engine
 from app.seed import seed_categories
-from app.api import cards, statements, transactions, analytics, alerts, webhooks, inboxes
+from app.api import auth, cards, statements, transactions, analytics, alerts, webhooks, inboxes
 
 
 @asynccontextmanager
@@ -26,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(inboxes.router, prefix="/api/v1/inboxes", tags=["inboxes"])
 app.include_router(cards.router, prefix="/api/v1/cards", tags=["cards"])
 app.include_router(statements.router, prefix="/api/v1/statements", tags=["statements"])
