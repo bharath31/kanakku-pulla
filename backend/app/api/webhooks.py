@@ -1,9 +1,12 @@
 import base64
 import hashlib
+import hmac
+import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models.credit_card import CreditCard
 from app.models.inbox import Inbox
@@ -12,6 +15,8 @@ from app.models.transaction import Transaction
 from app.parsers.registry import auto_detect_and_parse, get_parser
 from app.services.ai_analyzer import categorize_transactions
 from app.services.alert_engine import run_alerts_for_statement
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -25,9 +30,27 @@ BANK_SENDERS = {
 }
 
 
+def _verify_webhook_signature(body_bytes: bytes, signature: str | None) -> bool:
+    """Verify HMAC signature from AgentMail webhook."""
+    secret = settings.agentmail_webhook_secret
+    if not secret:
+        return True  # No secret configured, skip verification
+    if not signature:
+        return False
+    expected = hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
 @router.post("/agentmail")
 async def agentmail_webhook(request: Request, db: Session = Depends(get_db)):
     """Receive incoming emails from AgentMail webhooks."""
+    body_bytes = await request.body()
+
+    # Verify webhook signature
+    signature = request.headers.get("X-Signature")
+    if not _verify_webhook_signature(body_bytes, signature):
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
     body = await request.json()
 
     to_address = body.get("to", "")
@@ -62,9 +85,12 @@ async def agentmail_webhook(request: Request, db: Session = Depends(get_db)):
         if not pdf_bytes:
             continue
 
-        # Dedup
+        # Dedup — scoped to current card's statements
         file_hash = hashlib.sha256(pdf_bytes).hexdigest()
-        if db.query(Statement).filter(Statement.pdf_file_hash == file_hash).first():
+        if db.query(Statement).filter(
+            Statement.pdf_file_hash == file_hash,
+            Statement.card_id == card.id,
+        ).first():
             continue
 
         # Generate password

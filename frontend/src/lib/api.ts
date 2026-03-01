@@ -37,7 +37,29 @@ export const login = (username: string, password: string) =>
   });
 
 export const getMe = () =>
-  request<{ id: number; username: string; email: string | null }>("/auth/me");
+  request<{ id: number; username: string; email: string | null; totp_enabled: boolean }>("/auth/me");
+
+// 2FA
+export const setup2FA = () =>
+  request<{ secret: string; otpauth_uri: string }>("/auth/2fa/setup", { method: "POST" });
+
+export const confirm2FA = (code: string) =>
+  request<{ ok: boolean }>("/auth/2fa/confirm", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+
+export const disable2FA = (code: string) =>
+  request<{ ok: boolean }>("/auth/2fa/disable", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+
+export const verify2FA = (code: string) =>
+  request<{ access_token: string }>("/auth/2fa/verify", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
 
 // Cards
 export const getCards = () => request<Card[]>("/cards/");
@@ -81,6 +103,11 @@ export const updateCategory = (txnId: number, categoryId: number) =>
 
 export const getCategories = () => request<Category[]>("/transactions/categories");
 
+export const autoCategorize = () =>
+  request<{ categorized: number; remaining: number }>("/transactions/auto-categorize", {
+    method: "POST",
+  });
+
 // Analytics
 export const getMonthlyAnalytics = (params?: Record<string, string>) => {
   const qs = params ? "?" + new URLSearchParams(params).toString() : "";
@@ -105,6 +132,10 @@ export const markAlertRead = (id: number) =>
 
 export const dismissAlert = (id: number) =>
   request(`/alerts/${id}/dismiss`, { method: "PUT" });
+
+// AI Activity
+export const getAIActivity = (limit?: number) =>
+  request<AIActivity[]>(`/ai/activity${limit ? `?limit=${limit}` : ""}`);
 
 // Types
 export interface Card {
@@ -203,4 +234,12 @@ export interface AlertSummary {
   unread: number;
   critical: number;
   warning: number;
+}
+
+export interface AIActivity {
+  id: number;
+  action_type: string;
+  description: string;
+  metadata_json: string | null;
+  created_at: string;
 }

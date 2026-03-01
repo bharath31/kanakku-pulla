@@ -4,10 +4,23 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.database import get_db
 from app.models.alert import Alert
+from app.models.credit_card import CreditCard
+from app.models.statement import Statement
 from app.models.user import User
 from app.schemas.alerts import AlertResponse, AlertSummary
 
 router = APIRouter()
+
+
+def _user_alert_query(db: Session, user: User):
+    """Return a base query for alerts scoped to the current user's cards."""
+    user_card_ids = [c.id for c in db.query(CreditCard).filter(CreditCard.user_id == user.id).all()]
+    return db.query(Alert).join(
+        Statement, Alert.statement_id == Statement.id
+    ).filter(
+        Statement.card_id.in_(user_card_ids),
+        Alert.is_dismissed == False,  # noqa: E712
+    )
 
 
 @router.get("/", response_model=list[AlertResponse])
@@ -20,7 +33,7 @@ def list_alerts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = db.query(Alert).filter(Alert.is_dismissed == False)  # noqa: E712
+    query = _user_alert_query(db, current_user)
 
     if alert_type:
         query = query.filter(Alert.alert_type == alert_type)
@@ -34,7 +47,7 @@ def list_alerts(
 
 @router.get("/summary", response_model=AlertSummary)
 def alert_summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    base = db.query(Alert).filter(Alert.is_dismissed == False)  # noqa: E712
+    base = _user_alert_query(db, current_user)
     total = base.count()
     unread = base.filter(Alert.is_read == False).count()  # noqa: E712
     critical = base.filter(Alert.severity == "critical").count()
@@ -44,7 +57,10 @@ def alert_summary(db: Session = Depends(get_db), current_user: User = Depends(ge
 
 @router.put("/{alert_id}/read")
 def mark_read(alert_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    alert = db.query(Alert).filter(Alert.id == alert_id).first()
+    user_card_ids = [c.id for c in db.query(CreditCard).filter(CreditCard.user_id == current_user.id).all()]
+    alert = db.query(Alert).join(
+        Statement, Alert.statement_id == Statement.id
+    ).filter(Alert.id == alert_id, Statement.card_id.in_(user_card_ids)).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
     alert.is_read = True
@@ -54,7 +70,10 @@ def mark_read(alert_id: int, db: Session = Depends(get_db), current_user: User =
 
 @router.put("/{alert_id}/dismiss")
 def dismiss_alert(alert_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    alert = db.query(Alert).filter(Alert.id == alert_id).first()
+    user_card_ids = [c.id for c in db.query(CreditCard).filter(CreditCard.user_id == current_user.id).all()]
+    alert = db.query(Alert).join(
+        Statement, Alert.statement_id == Statement.id
+    ).filter(Alert.id == alert_id, Statement.card_id.in_(user_card_ids)).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
     alert.is_dismissed = True

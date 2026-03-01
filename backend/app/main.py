@@ -8,7 +8,7 @@ from sqlalchemy import inspect, text
 from app.config import settings
 from app.database import Base, engine
 from app.seed import seed_categories
-from app.api import auth, cards, statements, transactions, analytics, alerts, webhooks, inboxes
+from app.api import auth, cards, statements, transactions, analytics, alerts, webhooks, inboxes, ai_activity
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,13 @@ def _run_migrations():
                 logger.info("Adding user_id column to credit_cards")
                 conn.execute(text("ALTER TABLE credit_cards ADD COLUMN user_id INTEGER REFERENCES users(id)"))
 
+        if "users" in inspector.get_table_names():
+            existing = {col["name"] for col in inspector.get_columns("users")}
+            if "totp_secret" not in existing:
+                logger.info("Adding 2FA columns to users")
+                conn.execute(text("ALTER TABLE users ADD COLUMN totp_secret TEXT"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN totp_pending_secret TEXT"))
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,7 +39,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Kanakku Pulla", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Kanakku Pulla", version="0.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -50,6 +57,7 @@ app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["tr
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
 app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["alerts"])
 app.include_router(webhooks.router, prefix="/api/v1/webhooks", tags=["webhooks"])
+app.include_router(ai_activity.router, prefix="/api/v1/ai", tags=["ai"])
 
 
 @app.get("/health")

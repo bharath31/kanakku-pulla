@@ -10,6 +10,7 @@ from app.models.credit_card import CreditCard
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.transactions import CategoryOverride, TransactionResponse
+from app.services.ai_analyzer import categorize_transactions
 
 router = APIRouter()
 
@@ -93,6 +94,40 @@ def update_category(
     data = TransactionResponse.model_validate(txn)
     data.category_name = cat.name
     return data
+
+
+@router.post("/auto-categorize")
+async def auto_categorize(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Re-categorize all uncategorized transactions for the current user."""
+    user_card_ids = [c.id for c in db.query(CreditCard).filter(CreditCard.user_id == current_user.id).all()]
+    uncategorized = (
+        db.query(Transaction)
+        .filter(
+            Transaction.card_id.in_(user_card_ids),
+            Transaction.category_id.is_(None),
+            Transaction.is_fee == False,  # noqa: E712
+        )
+        .all()
+    )
+
+    if not uncategorized:
+        return {"categorized": 0, "message": "No uncategorized transactions found"}
+
+    txn_ids = [t.id for t in uncategorized]
+    await categorize_transactions(db, txn_ids, user_id=current_user.id)
+
+    # Count how many were categorized
+    still_uncategorized = (
+        db.query(Transaction)
+        .filter(Transaction.id.in_(txn_ids), Transaction.category_id.is_(None))
+        .count()
+    )
+    categorized = len(txn_ids) - still_uncategorized
+
+    return {"categorized": categorized, "remaining": still_uncategorized}
 
 
 @router.get("/categories")

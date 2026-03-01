@@ -1,15 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   getCards,
   getStatements,
@@ -17,7 +9,7 @@ import {
   type Card as CardType,
   type Statement,
 } from "@/lib/api";
-import { Upload, FileText, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Upload, CheckCircle, XCircle, Loader2 } from "lucide-react";
 
 export default function StatementsPage() {
   const [cards, setCards] = useState<CardType[]>([]);
@@ -29,9 +21,12 @@ export default function StatementsPage() {
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
-    getCards().then(setCards).catch(() => {});
+    getCards().then((c) => {
+      setCards(c);
+      if (c.length > 0 && !selectedCard) setSelectedCard(c[0].id.toString());
+    }).catch(() => {});
     getStatements().then(setStatements).catch(() => {});
-  }, []);
+  }, [selectedCard]);
 
   const handleUpload = useCallback(
     async (file: File) => {
@@ -51,7 +46,7 @@ export default function StatementsPage() {
       try {
         const stmt = await uploadStatement(file, parseInt(selectedCard));
         setSuccess(
-          `Statement parsed successfully! Found ${stmt.parse_status === "parsed" ? "transactions" : "0 transactions"}.`
+          `Statement parsed successfully! Status: ${stmt.parse_status}`
         );
         getStatements().then(setStatements).catch(() => {});
       } catch (err) {
@@ -81,146 +76,118 @@ export default function StatementsPage() {
   const statusIcon = (status: string) => {
     switch (status) {
       case "parsed":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-3.5 w-3.5 text-accent-green" />;
       case "failed":
-        return <XCircle className="h-4 w-4 text-red-500" />;
+        return <XCircle className="h-3.5 w-3.5 text-accent-red" />;
       default:
-        return <Loader2 className="h-4 w-4 animate-spin" />;
+        return <Loader2 className="h-3.5 w-3.5 animate-spin" />;
     }
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Statements</h1>
+    <div className="p-4 md:p-6 space-y-6 max-w-3xl mx-auto">
+      {/* Card selector as pills */}
+      {cards.length > 0 ? (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {cards.map((card) => (
+            <button
+              key={card.id}
+              onClick={() => setSelectedCard(card.id.toString())}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+                selectedCard === card.id.toString()
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {card.bank} {card.last_four ? `••${card.last_four}` : ""}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Add a card in Settings first.
+        </p>
+      )}
 
-      {/* Upload Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Upload Statement</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Select value={selectedCard} onValueChange={setSelectedCard}>
-            <SelectTrigger className="w-full max-w-xs">
-              <SelectValue placeholder="Select a card" />
-            </SelectTrigger>
-            <SelectContent>
-              {cards.map((card) => (
-                <SelectItem key={card.id} value={card.id.toString()}>
-                  {card.bank} {card.card_name || ""}{" "}
-                  {card.last_four ? `•••• ${card.last_four}` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {cards.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Add a card in Settings first before uploading statements.
-            </p>
-          )}
-
-          <div
-            className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
-              dragOver
-                ? "border-primary bg-primary/5"
-                : "border-muted-foreground/25"
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-          >
-            {uploading ? (
-              <div className="flex flex-col items-center gap-2">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm">Parsing your statement...</p>
-              </div>
-            ) : (
-              <label className="cursor-pointer flex flex-col items-center gap-3">
-                <Upload className="h-8 w-8 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">
-                    Drop your CC statement PDF here
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    or click to browse
-                  </p>
-                </div>
-                <input
-                  type="file"
-                  accept=".pdf"
-                  className="hidden"
-                  onChange={handleFileInput}
-                />
-              </label>
-            )}
+      {/* Upload area — Minimal */}
+      <div
+        className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
+          dragOver
+            ? "border-primary bg-primary/5"
+            : "border-border hover:border-muted-foreground/40"
+        }`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+      >
+        {uploading ? (
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Parsing statement...</p>
           </div>
+        ) : (
+          <label className="cursor-pointer flex flex-col items-center gap-2">
+            <Upload className="h-6 w-6 text-muted-foreground" />
+            <p className="text-sm font-medium">Drop PDF</p>
+            <p className="text-xs text-muted-foreground">or click to browse</p>
+            <input
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              onChange={handleFileInput}
+            />
+          </label>
+        )}
+      </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-          {success && (
-            <p className="text-sm text-green-500">{success}</p>
-          )}
-        </CardContent>
-      </Card>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {success && <p className="text-sm text-accent-green">{success}</p>}
 
-      {/* Statement History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Statement History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {statements.length > 0 ? (
-            <div className="space-y-3">
-              {statements.map((stmt) => (
-                <div
-                  key={stmt.id}
-                  className="flex items-center justify-between border-b pb-3 last:border-0"
-                >
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium text-sm">
-                        Statement{" "}
-                        {stmt.statement_date
-                          ? new Date(stmt.statement_date).toLocaleDateString(
-                              "en-IN",
-                              { month: "long", year: "numeric" }
-                            )
-                          : `#${stmt.id}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {stmt.source === "email" ? "Via email" : "Uploaded"} ·{" "}
-                        {new Date(stmt.created_at).toLocaleDateString("en-IN")}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {stmt.total_due && (
-                      <span className="text-sm font-mono">
-                        ₹{Number(stmt.total_due).toLocaleString("en-IN")}
-                      </span>
-                    )}
-                    <div className="flex items-center gap-1">
-                      {statusIcon(stmt.parse_status)}
-                      <Badge variant="outline" className="text-xs">
-                        {stmt.parse_status}
-                      </Badge>
-                    </div>
-                  </div>
+      {/* Statement list */}
+      <div className="rounded-xl border border-border bg-card divide-y divide-border/50">
+        {statements.length > 0 ? (
+          statements.map((stmt) => (
+            <div
+              key={stmt.id}
+              className="flex items-center justify-between px-5 py-3"
+            >
+              <div>
+                <p className="text-sm font-medium">
+                  {stmt.statement_date
+                    ? new Date(stmt.statement_date).toLocaleDateString("en-IN", {
+                        month: "long",
+                        year: "numeric",
+                      })
+                    : `Statement #${stmt.id}`}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {new Date(stmt.created_at).toLocaleDateString("en-IN")}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                {stmt.total_due != null && (
+                  <span className="text-sm font-mono">
+                    ₹{Number(stmt.total_due).toLocaleString("en-IN")}
+                  </span>
+                )}
+                <div className="flex items-center gap-1.5">
+                  {statusIcon(stmt.parse_status)}
+                  <Badge variant="outline" className="text-[10px]">
+                    {stmt.parse_status}
+                  </Badge>
                 </div>
-              ))}
+              </div>
             </div>
-          ) : (
-            <p className="text-muted-foreground text-sm py-8 text-center">
-              No statements uploaded yet.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          ))
+        ) : (
+          <p className="text-muted-foreground text-sm py-12 text-center">
+            No statements uploaded yet.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

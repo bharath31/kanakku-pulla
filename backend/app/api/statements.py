@@ -30,9 +30,13 @@ async def upload_statement(
 
     pdf_bytes = await file.read()
 
-    # Dedup check
+    # Dedup check — scoped to current user's cards
     file_hash = hashlib.sha256(pdf_bytes).hexdigest()
-    existing = db.query(Statement).filter(Statement.pdf_file_hash == file_hash).first()
+    user_card_ids = [c.id for c in db.query(CreditCard).filter(CreditCard.user_id == current_user.id).all()]
+    existing = db.query(Statement).filter(
+        Statement.pdf_file_hash == file_hash,
+        Statement.card_id.in_(user_card_ids),
+    ).first()
     if existing:
         raise HTTPException(status_code=409, detail="Statement already uploaded")
 

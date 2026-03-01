@@ -26,6 +26,13 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
+def verify_totp(secret: str, code: str) -> bool:
+    """Verify a TOTP code against a secret."""
+    import pyotp
+    totp = pyotp.TOTP(secret)
+    return totp.verify(code, valid_window=1)
+
+
 # Minimal HS256 JWT using Python stdlib — avoids cryptography C-extension dependency
 def _b64url_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
@@ -38,10 +45,13 @@ def _b64url_decode(s: str) -> bytes:
     return base64.urlsafe_b64decode(s)
 
 
-def create_access_token(user_id: int) -> str:
+def create_access_token(user_id: int, pending_2fa: bool = False) -> str:
     expire = int(time.time()) + int(timedelta(minutes=settings.jwt_expire_minutes).total_seconds())
+    payload = {"sub": str(user_id), "exp": expire}
+    if pending_2fa:
+        payload["2fa"] = "pending"
     header = _b64url_encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
-    body = _b64url_encode(json.dumps({"sub": str(user_id), "exp": expire}).encode())
+    body = _b64url_encode(json.dumps(payload).encode())
     msg = f"{header}.{body}"
     sig = _b64url_encode(hmac.new(settings.jwt_secret_key.encode(), msg.encode(), hashlib.sha256).digest())
     return f"{msg}.{sig}"

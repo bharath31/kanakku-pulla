@@ -20,6 +20,7 @@ dependencies = [
     "agentmail>=0.2.0",
     "cffi>=1.17.0",
     "passlib>=1.7.4",
+    "pyotp>=2.9.0",
 ]
 
 [project.optional-dependencies]

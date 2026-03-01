@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   getTransactions,
   getCategories,
   updateCategory,
+  autoCategorize,
   type Transaction,
   type Category,
 } from "@/lib/api";
@@ -18,27 +18,57 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FilterChips } from "@/components/filter-chips";
+import { CategoryPill } from "@/components/category-pill";
+import { Sparkles, Loader2 } from "lucide-react";
+
+const FILTER_CHIPS = [
+  { label: "All", value: "all" },
+  { label: "Fees", value: "fees" },
+  { label: "Uncategorized", value: "uncategorized" },
+  { label: "International", value: "international" },
+];
 
 export default function TransactionsPage() {
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState("");
-  const [filterFees, setFilterFees] = useState<string>("");
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [categorizing, setCategorizing] = useState(false);
+  const [categorizeResult, setCategorizeResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadTransactions = useCallback(
+    (params?: Record<string, string>) => {
+      setError(null);
+      getTransactions({ limit: "200", ...params })
+        .then(setTxns)
+        .catch((err) => setError(err instanceof Error ? err.message : "Failed to load"));
+    },
+    []
+  );
 
   useEffect(() => {
     getCategories().then(setCategories).catch(() => {});
     loadTransactions();
-  }, []);
+  }, [loadTransactions]);
 
-  const loadTransactions = (params?: Record<string, string>) => {
-    getTransactions({ limit: "200", ...params }).then(setTxns).catch(() => {});
-  };
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const params: Record<string, string> = {};
+      if (search) params.search = search;
+      if (activeFilter === "fees") params.is_fee = "true";
+      loadTransactions(params);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search, activeFilter, loadTransactions]);
 
-  const handleSearch = () => {
+  const handleFilterChange = (value: string) => {
+    setActiveFilter(value);
     const params: Record<string, string> = {};
     if (search) params.search = search;
-    if (filterFees === "fees") params.is_fee = "true";
-    if (filterFees === "no_fees") params.is_fee = "false";
+    if (value === "fees") params.is_fee = "true";
     loadTransactions(params);
   };
 
@@ -48,118 +78,176 @@ export default function TransactionsPage() {
       setTxns((prev) =>
         prev.map((t) => (t.id === txnId ? { ...t, ...updated } : t))
       );
-    } catch {
-      // ignore
+    } catch { /* ignore */ }
+  };
+
+  const handleAutoCategorize = async () => {
+    setCategorizing(true);
+    setCategorizeResult(null);
+    try {
+      const result = await autoCategorize();
+      setCategorizeResult(
+        result.categorized > 0
+          ? `Categorized ${result.categorized} transaction${result.categorized !== 1 ? "s" : ""}${
+              result.remaining > 0 ? `, ${result.remaining} remaining` : ""
+            }`
+          : "No uncategorized transactions found"
+      );
+      loadTransactions();
+    } catch (err) {
+      setCategorizeResult(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setCategorizing(false);
     }
   };
 
-  return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Transactions</h1>
+  // Filter uncategorized/international client-side
+  const filteredTxns =
+    activeFilter === "uncategorized"
+      ? txns.filter((t) => !t.category_id && !t.is_fee)
+      : activeFilter === "international"
+      ? txns.filter((t) => t.is_international)
+      : txns;
 
-      {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
-        <Input
-          placeholder="Search merchant or description..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          className="max-w-xs"
+  return (
+    <div className="p-4 md:p-6 space-y-4 max-w-5xl mx-auto">
+      {error && (
+        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      {/* Search bar */}
+      <Input
+        placeholder="Search transactions..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="max-w-lg bg-card border-border"
+      />
+
+      {/* Filter chips + Auto-categorize */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <FilterChips
+          chips={FILTER_CHIPS}
+          active={activeFilter}
+          onChange={handleFilterChange}
         />
-        <Select value={filterFees} onValueChange={(v) => { setFilterFees(v); }}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="All types" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All types</SelectItem>
-            <SelectItem value="fees">Fees only</SelectItem>
-            <SelectItem value="no_fees">No fees</SelectItem>
-          </SelectContent>
-        </Select>
         <button
-          onClick={handleSearch}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm"
+          onClick={handleAutoCategorize}
+          disabled={categorizing}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
-          Search
+          {categorizing ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Sparkles className="h-3 w-3" />
+          )}
+          {categorizing ? "Categorizing..." : "Auto-categorize"}
         </button>
       </div>
 
+      {categorizeResult && (
+        <p className="text-xs text-accent-green">{categorizeResult}</p>
+      )}
+
       {/* Transaction List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{txns.length} Transactions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {txns.length > 0 ? (
-            <div className="space-y-2">
-              {txns.map((txn) => (
-                <div
-                  key={txn.id}
-                  className="flex items-center justify-between border-b py-3 last:border-0 gap-4"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm truncate">
-                        {txn.merchant_name || txn.description}
-                      </p>
-                      {txn.is_fee && (
-                        <Badge variant="destructive" className="text-xs">
-                          {txn.fee_type?.replace("_", " ") || "Fee"}
-                        </Badge>
-                      )}
-                      {txn.is_emi && (
-                        <Badge variant="secondary" className="text-xs">
-                          EMI
-                        </Badge>
-                      )}
-                      {txn.is_international && (
-                        <Badge variant="outline" className="text-xs">
-                          Intl
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {txn.txn_date}
-                      {txn.description !== txn.merchant_name &&
-                        ` · ${txn.description}`}
+      <div className="rounded-xl border border-border bg-card">
+        <div className="px-5 py-3 border-b border-border">
+          <span className="text-sm font-medium text-muted-foreground">
+            {filteredTxns.length} transaction{filteredTxns.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+        <div className="divide-y divide-border/50">
+          {filteredTxns.length > 0 ? (
+            filteredTxns.map((txn) => (
+              <div
+                key={txn.id}
+                className={`flex items-center justify-between px-5 py-3 gap-4 ${
+                  !txn.category_id && !txn.is_fee
+                    ? "border-l-2 border-l-accent-amber/50"
+                    : ""
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm truncate">
+                      {txn.merchant_name || txn.description}
                     </p>
+                    {txn.is_fee && (
+                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                        {txn.fee_type?.replace("_", " ") || "Fee"}
+                      </Badge>
+                    )}
+                    {txn.is_emi && (
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                        EMI
+                      </Badge>
+                    )}
+                    {txn.is_international && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        Intl
+                      </Badge>
+                    )}
                   </div>
-
-                  {/* Category Selector */}
-                  <Select
-                    value={txn.category_id?.toString() || ""}
-                    onValueChange={(v) => handleCategoryChange(txn.id, v)}
-                  >
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id.toString()}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <span
-                    className={`font-mono font-medium whitespace-nowrap ${
-                      txn.amount < 0 ? "text-green-500" : ""
-                    }`}
-                  >
-                    {txn.amount < 0 ? "+" : ""}₹
-                    {Math.abs(txn.amount).toLocaleString("en-IN")}
-                  </span>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {txn.txn_date}
+                  </p>
                 </div>
-              ))}
-            </div>
+
+                {/* Category */}
+                <div className="shrink-0">
+                  {txn.category_name ? (
+                    <Select
+                      value={txn.category_id?.toString() || ""}
+                      onValueChange={(v) => handleCategoryChange(txn.id, v)}
+                    >
+                      <SelectTrigger className="border-0 bg-transparent p-0 h-auto shadow-none focus:ring-0">
+                        <CategoryPill name={txn.category_name} interactive />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id.toString()}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Select
+                      value=""
+                      onValueChange={(v) => handleCategoryChange(txn.id, v)}
+                    >
+                      <SelectTrigger className="w-[120px] h-7 text-xs">
+                        <SelectValue placeholder="Assign..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id.toString()}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                <span
+                  className={`font-mono font-semibold text-sm whitespace-nowrap ${
+                    txn.amount < 0 ? "text-accent-green" : ""
+                  }`}
+                >
+                  {txn.amount < 0 ? "+" : ""}₹
+                  {Math.abs(txn.amount).toLocaleString("en-IN")}
+                </span>
+              </div>
+            ))
           ) : (
-            <p className="text-muted-foreground text-sm py-8 text-center">
-              No transactions found. Upload a statement to see your transactions.
+            <p className="text-muted-foreground text-sm py-12 text-center">
+              No transactions found.
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

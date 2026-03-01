@@ -6,5 +6,10 @@ from app.models.transaction import Transaction
 from app.models.category import Category
 from app.models.alert import Alert
 from app.models.reward_points import RewardPoints
+from app.models.ai_activity import AIActivity
+from app.models.merchant_cache import MerchantCache
 
-__all__ = ["User", "Inbox", "CreditCard", "Statement", "Transaction", "Category", "Alert", "RewardPoints"]
+__all__ = [
+    "User", "Inbox", "CreditCard", "Statement", "Transaction",
+    "Category", "Alert", "RewardPoints", "AIActivity", "MerchantCache",
+]

@@ -151,7 +151,8 @@ def rewards_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    query = db.query(RewardPoints)
+    user_card_ids = [c.id for c in db.query(CreditCard).filter(CreditCard.user_id == current_user.id).all()]
+    query = db.query(RewardPoints).filter(RewardPoints.card_id.in_(user_card_ids))
     if card_id:
         query = query.filter(RewardPoints.card_id == card_id)
 

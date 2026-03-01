@@ -4,7 +4,10 @@ from datetime import timedelta
 from sqlalchemy.orm import Session
 
 from app.models.alert import Alert
+from app.models.credit_card import CreditCard
+from app.models.statement import Statement
 from app.models.transaction import Transaction
+from app.services.ai_activity_logger import log_ai_activity
 
 FEE_DESCRIPTIONS = {
     "annual_fee": (re.compile(r"(annual|membership)\s*(fee|charge)", re.IGNORECASE), "warning"),
@@ -27,22 +30,53 @@ FEE_TIPS = {
 }
 
 
+def _get_user_id_for_statement(db: Session, statement_id: int) -> int | None:
+    stmt = db.query(Statement).filter(Statement.id == statement_id).first()
+    if not stmt:
+        return None
+    card = db.query(CreditCard).filter(CreditCard.id == stmt.card_id).first()
+    return card.user_id if card else None
+
+
 def run_alerts_for_statement(db: Session, statement_id: int):
     """Run all alert checks for a newly parsed statement."""
     txns = db.query(Transaction).filter(Transaction.statement_id == statement_id).all()
 
+    fees_found = []
+    duplicates_found = 0
+
     for txn in txns:
         # Fee detection
-        _check_fees(db, txn, statement_id)
+        fee = _check_fees(db, txn, statement_id)
+        if fee:
+            fees_found.append(fee)
 
         # Duplicate charge detection
-        _check_duplicates(db, txn, statement_id)
+        if _check_duplicates(db, txn, statement_id):
+            duplicates_found += 1
+
+    # Log AI activities
+    user_id = _get_user_id_for_statement(db, statement_id)
+    if user_id:
+        if fees_found:
+            total_fee_amount = sum(f["amount"] for f in fees_found)
+            log_ai_activity(
+                db, user_id, "fee_detected",
+                f"Detected {len(fees_found)} fee{'s' if len(fees_found) != 1 else ''} totalling ₹{total_fee_amount:,.0f}",
+                {"fees": fees_found},
+            )
+        if duplicates_found:
+            log_ai_activity(
+                db, user_id, "duplicate_found",
+                f"Found {duplicates_found} possible duplicate charge{'s' if duplicates_found != 1 else ''}",
+            )
 
 
-def _check_fees(db: Session, txn: Transaction, statement_id: int):
+def _check_fees(db: Session, txn: Transaction, statement_id: int) -> dict | None:
     if not txn.description:
-        return
+        return None
 
+    result = None
     for fee_type, (pattern, severity) in FEE_DESCRIPTIONS.items():
         if pattern.search(txn.description):
             tip = FEE_TIPS.get(fee_type, "")
@@ -59,13 +93,15 @@ def _check_fees(db: Session, txn: Transaction, statement_id: int):
                 description=description,
             )
             db.add(alert)
+            result = {"type": fee_type, "amount": float(txn.amount)}
 
     db.commit()
+    return result
 
 
-def _check_duplicates(db: Session, txn: Transaction, statement_id: int):
+def _check_duplicates(db: Session, txn: Transaction, statement_id: int) -> bool:
     if not txn.txn_date or not txn.merchant_name:
-        return
+        return False
 
     # Look for same merchant + same amount within 24 hours
     dupes = (
@@ -91,3 +127,6 @@ def _check_duplicates(db: Session, txn: Transaction, statement_id: int):
         )
         db.add(alert)
         db.commit()
+        return True
+
+    return False
