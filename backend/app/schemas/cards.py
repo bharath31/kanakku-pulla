@@ -31,5 +31,7 @@ class CardResponse(BaseModel):
     holder_name: str
     dob: date | None
     credit_limit: Decimal | None
+    inbox_id: int | None = None
+    inbox_email: str | None = None
 
     model_config = {"from_attributes": True}

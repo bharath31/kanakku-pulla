@@ -1,3 +1,4 @@
+import base64
 import hashlib
 
 from fastapi import APIRouter, Depends, Request
@@ -9,6 +10,7 @@ from app.models.inbox import Inbox
 from app.models.statement import Statement
 from app.models.transaction import Transaction
 from app.parsers.registry import auto_detect_and_parse, get_parser
+from app.services.ai_analyzer import categorize_transactions
 from app.services.alert_engine import run_alerts_for_statement
 
 router = APIRouter()
@@ -55,7 +57,6 @@ async def agentmail_webhook(request: Request, db: Session = Depends(get_db)):
             continue
 
         # Attachment content should be base64-encoded
-        import base64
         pdf_bytes = base64.b64decode(attachment.get("content", ""))
 
         if not pdf_bytes:
@@ -123,6 +124,8 @@ async def agentmail_webhook(request: Request, db: Session = Depends(get_db)):
 
         db.commit()
         run_alerts_for_statement(db, stmt.id)
+        txn_ids = [t.id for t in db.query(Transaction).filter(Transaction.statement_id == stmt.id).all()]
+        await categorize_transactions(db, txn_ids)
         processed += 1
 
     return {"status": "ok", "statements_processed": processed}

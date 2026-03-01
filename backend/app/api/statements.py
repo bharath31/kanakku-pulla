@@ -9,6 +9,7 @@ from app.models.statement import Statement
 from app.models.transaction import Transaction
 from app.parsers.registry import auto_detect_and_parse, get_parser
 from app.schemas.statements import StatementResponse
+from app.services.ai_analyzer import categorize_transactions
 from app.services.alert_engine import run_alerts_for_statement
 
 router = APIRouter()
@@ -99,8 +100,10 @@ async def upload_statement(
     db.commit()
     db.refresh(stmt)
 
-    # Run alert engine
+    # Run alert engine and AI categorization
     run_alerts_for_statement(db, stmt.id)
+    txn_ids = [t.id for t in db.query(Transaction).filter(Transaction.statement_id == stmt.id).all()]
+    await categorize_transactions(db, txn_ids)
 
     return stmt
 
