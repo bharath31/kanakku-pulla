@@ -19,7 +19,7 @@ Your data **never leaves your machine**. Everything runs locally:
 
 ## One-Click Deploy
 
-[![Deploy on Fly.io](https://fly.io/button/button.svg)](https://fly.io/launch?repo=https://github.com/bharath31/kanakku-pulla)
+[![Deploy on Fly.io](https://img.shields.io/badge/Deploy%20on-Fly.io-7b3fe4?logo=fly.io)](https://fly.io/launch?repo=https://github.com/bharath31/kanakku-pulla)
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template?repo=https://github.com/bharath31/kanakku-pulla)
 
 ## Quick Start
