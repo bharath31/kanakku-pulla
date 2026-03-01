@@ -196,39 +196,28 @@ export default function TransactionsPage() {
 
                 {/* Category */}
                 <div className="shrink-0">
-                  {txn.category_name ? (
-                    <Select
-                      value={txn.category_id?.toString() || ""}
-                      onValueChange={(v) => handleCategoryChange(txn.id, v)}
-                    >
-                      <SelectTrigger className="border-0 bg-transparent p-0 h-auto shadow-none focus:ring-0">
-                        <CategoryPill name={txn.category_name} interactive />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id.toString()}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Select
-                      value=""
-                      onValueChange={(v) => handleCategoryChange(txn.id, v)}
-                    >
-                      <SelectTrigger className="w-[120px] h-7 text-xs">
+                  <Select
+                    value={txn.category_id?.toString() || ""}
+                    onValueChange={(v) => handleCategoryChange(txn.id, v)}
+                  >
+                    <SelectTrigger className={txn.category_name
+                      ? "border-0 bg-transparent p-0 h-auto shadow-none focus:ring-0 cursor-pointer"
+                      : "w-[120px] h-7 text-xs"
+                    }>
+                      {txn.category_name ? (
+                        <CategoryPill name={txn.category_name} />
+                      ) : (
                         <SelectValue placeholder="Assign..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id.toString()}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
+                      )}
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id.toString()}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                     </Select>
-                  )}
                 </div>
 
                 <span
