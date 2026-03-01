@@ -1,8 +1,15 @@
+import { getToken } from "./auth";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { "Content-Type": "application/json", ...options?.headers },
+    headers: { "Content-Type": "application/json", ...authHeaders(), ...options?.headers },
     ...options,
   });
   if (!res.ok) {
@@ -11,6 +18,22 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
   return res.json();
 }
+
+// Auth
+export const signup = (username: string, password: string, email?: string) =>
+  request<{ access_token: string }>("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ username, password, email }),
+  });
+
+export const login = (username: string, password: string) =>
+  request<{ access_token: string }>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+
+export const getMe = () =>
+  request<{ id: number; username: string; email: string | null }>("/auth/me");
 
 // Cards
 export const getCards = () => request<Card[]>("/cards");
@@ -30,6 +53,7 @@ export const uploadStatement = async (file: File, cardId: number) => {
   form.append("file", file);
   const res = await fetch(`${API_URL}/statements/upload?card_id=${cardId}`, {
     method: "POST",
+    headers: authHeaders(),
     body: form,
   });
   if (!res.ok) {

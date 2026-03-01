@@ -3,8 +3,10 @@ import hashlib
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_user
 from app.database import get_db
 from app.models.credit_card import CreditCard
+from app.models.user import User
 from app.models.statement import Statement
 from app.models.transaction import Transaction
 from app.parsers.registry import auto_detect_and_parse, get_parser
@@ -20,8 +22,9 @@ async def upload_statement(
     file: UploadFile,
     card_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    card = db.query(CreditCard).filter(CreditCard.id == card_id).first()
+    card = db.query(CreditCard).filter(CreditCard.id == card_id, CreditCard.user_id == current_user.id).first()
     if not card:
         raise HTTPException(status_code=404, detail="Card not found")
 
@@ -109,16 +112,26 @@ async def upload_statement(
 
 
 @router.get("/", response_model=list[StatementResponse])
-def list_statements(card_id: int | None = None, db: Session = Depends(get_db)):
-    query = db.query(Statement)
+def list_statements(
+    card_id: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    user_card_ids = [c.id for c in db.query(CreditCard).filter(CreditCard.user_id == current_user.id).all()]
+    query = db.query(Statement).filter(Statement.card_id.in_(user_card_ids))
     if card_id:
         query = query.filter(Statement.card_id == card_id)
     return query.order_by(Statement.created_at.desc()).all()
 
 
 @router.get("/{statement_id}", response_model=StatementResponse)
-def get_statement(statement_id: int, db: Session = Depends(get_db)):
-    stmt = db.query(Statement).filter(Statement.id == statement_id).first()
+def get_statement(
+    statement_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    user_card_ids = [c.id for c in db.query(CreditCard).filter(CreditCard.user_id == current_user.id).all()]
+    stmt = db.query(Statement).filter(Statement.id == statement_id, Statement.card_id.in_(user_card_ids)).first()
     if not stmt:
         raise HTTPException(status_code=404, detail="Statement not found")
     return stmt
